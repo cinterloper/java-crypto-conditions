@@ -1,129 +1,174 @@
 package org.interledger.cryptoconditions.encoding;
 
-import java.io.ByteArrayInputStream;
 
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
 
 import org.interledger.cryptoconditions.ConditionType;
 import org.interledger.cryptoconditions.Fulfillment;
-import org.interledger.cryptoconditions.PrefixSha256Fulfillment;
-import org.interledger.cryptoconditions.PreimageSha256Fulfillment;
-import org.interledger.cryptoconditions.Ed25519Fulfillment;
-import org.interledger.cryptoconditions.RsaSha256Fulfillment;
-import org.interledger.cryptoconditions.ThresholdSHA256Fulfillment;
+import org.interledger.cryptoconditions.IllegalFulfillmentException;
 import org.interledger.cryptoconditions.UnsupportedConditionException;
 import org.interledger.cryptoconditions.UnsupportedLengthException;
+import org.interledger.cryptoconditions.crypto.Ed25519Signature;
+import org.interledger.cryptoconditions.impl.Ed25519Fulfillment;
+import org.interledger.cryptoconditions.impl.PrefixSha256Fulfillment;
+import org.interledger.cryptoconditions.impl.PreimageSha256Fulfillment;
+import org.interledger.cryptoconditions.impl.RsaSha256Fulfillment;
 
-import org.interledger.cryptoconditions.types.*;
-
+import net.i2p.crypto.eddsa.EdDSAPublicKey;
 /**
  * Reads and decodes Fulfillments from an underlying input stream.
- *
+ * 
  * Fulfillments are expected to be OER encoded on the stream
- *
+ * 
  * @see Fulfillment
  * @author adrianhopebailie
  *
  */
 public class FulfillmentInputStream extends OerInputStream {
+	
+	public FulfillmentInputStream(InputStream stream) {
+		super(stream);
+	}
+	
+	/**
+	 * Read a fulfillment from the underlying stream using OER encoding
+	 * per the specification:
+	 * 
+	 * Fulfillment ::= SEQUENCE {
+	 *     type ConditionType,
+	 *     payload OCTET STRING
+	 * }
+	 * 
+	 * ConditionType ::= INTEGER {
+	 *     preimageSha256(0),
+	 *     rsaSha256(1),
+	 *     prefixSha256(2),
+	 *     thresholdSha256(3),
+	 *     ed25519(4)
+	 * } (0..65535)
+	 * 
+	 * @throws IOException
+	 * @throws OerDecodingException
+	 * @throws UnsupportedConditionException
+	 * @throws IllegalFulfillmentException 
+	 * @throws InvalidKeySpecException 
+	 * @throws NoSuchAlgorithmException 
+	 */
+	public Fulfillment readFulfillment()
+	        throws IOException, UnsupportedConditionException, OerDecodingException, NoSuchAlgorithmException, InvalidKeySpecException, IllegalFulfillmentException 
+	{
+		ConditionType type = readConditiontype();
+		switch (type) {
+			case PREIMAGE_SHA256:
+				return readPreimageSha256FulfillmentPayload();
+				
+			case PREFIX_SHA256:
+				return readPrefixSha256FulfillmentPayload();
+				
+			case RSA_SHA256:
+				return readRsaSha256FulfillmentPayload();
+				
+			case ED25519:
+				return readEd25519FulfillmentPayload();
+				
+			case THRESHOLD_SHA256:
+				//TODO return readThresholdSha256Fulfillment;
+			default:
+				throw new RuntimeException("Unimplemented fulfillment type encountered.");
+		}
+		
+	}
 
-    public FulfillmentInputStream(InputStream stream) {
-        super(stream);
-    }
+	public PreimageSha256Fulfillment readPreimageSha256FulfillmentPayload()
+			throws IOException, UnsupportedLengthException, IllegalLengthIndicatorException {
+		
+		PreimageSha256Fulfillment fulfillment = new PreimageSha256Fulfillment();
+		
+		fulfillment.setPreimage(readPayload());
+		
+		return fulfillment;
+	}
+	
+	public PrefixSha256Fulfillment readPrefixSha256FulfillmentPayload() 
+			throws IOException, UnsupportedConditionException, OerDecodingException, NoSuchAlgorithmException, InvalidKeySpecException, IllegalFulfillmentException {
+		
+		PrefixSha256Fulfillment fulfillment = new PrefixSha256Fulfillment();
+		
+		//Read the length indicator off the stream
+		readLengthIndicator();
+		
+		fulfillment.setPrefix(readOctetString());
+		fulfillment.setSubFulfillment(readFulfillment());
+		
+		return fulfillment;
+		
+	}
+	
+	public RsaSha256Fulfillment readRsaSha256FulfillmentPayload() 
+			throws IOException, UnsupportedLengthException, IllegalLengthIndicatorException, IllegalFulfillmentException, NoSuchAlgorithmException, InvalidKeySpecException {
+		
+		RsaSha256Fulfillment fulfillment = new RsaSha256Fulfillment();
+		
+		//Read the length indicator off the stream
+		readLengthIndicator();
+		
+		byte[] modulusBytes = readOctetString(
+				RsaSha256Fulfillment.MINIMUM_MODULUS_SIZE, 
+				RsaSha256Fulfillment.MAXIMUM_MODULUS_SIZE);
+						
+		byte[] signatureBytes = readOctetString(
+				RsaSha256Fulfillment.MINIMUM_SIGNATURE_SIZE, 
+				RsaSha256Fulfillment.MAXIMUM_SIGNATURE_SIZE);
+		
+		if(modulusBytes.length != signatureBytes.length)
+			throw new IllegalFulfillmentException("Modulus and signature must be the same size.");
+		
+		BigInteger modulus = new BigInteger(modulusBytes);
+		BigInteger signature = new BigInteger(signatureBytes);
+		
+		if(modulus.compareTo(signature) <= 0)
+			throw new IllegalFulfillmentException("Signature must be numerically smaller than modulus.");
+		
+		fulfillment.setPublicKey(RsaSha256Fulfillment.getPublicKeyFromModulus(modulus));
+		fulfillment.setSignature(signatureBytes);
+		
+		return fulfillment;
+		
+	}
 
-    /**
-     * Read a fulfillment from the underlying stream using OER encoding per the
-     * specification:
-     *
-     * Fulfillment ::= SEQUENCE { type ConditionType, payload OCTET STRING }
-     *
-     * ConditionType ::= INTEGER { preimageSha256(0), rsaSha256(1),
-     * prefixSha256(2), thresholdSha256(3), ed25519(4) } (0..65535)
-     *
-     * @return
-     * @throws IOException
-     * @throws OerDecodingException
-     * @throws UnsupportedConditionException
-     */
-    public Fulfillment readFulfillment()
-            throws IOException, UnsupportedConditionException, OerDecodingException {
-        final ConditionType type = readConditiontype();
-        final FulfillmentPayload payload = new FulfillmentPayload(this.readPayload());
+	public Ed25519Fulfillment readEd25519FulfillmentPayload() 
+			throws IOException, UnsupportedLengthException, IllegalLengthIndicatorException {
+		
+		Ed25519Fulfillment fulfillment = new Ed25519Fulfillment();
+		
+		//Read the length indicator off the stream
+		readLengthIndicator();
+		
+		byte[] publicKeyBytes = readOctetString(Ed25519Fulfillment.PUBKEY_LENGTH);
+		EdDSAPublicKey key = Ed25519Signature.getPublicKeyFromBytes(publicKeyBytes);
+		
+		fulfillment.setPublicKey(key);
+		fulfillment.setSignature(readOctetString(Ed25519Fulfillment.SIGNATURE_LENGTH));
+		
+		return fulfillment;
+		
+	}
 
-        ByteArrayInputStream byteStream = new ByteArrayInputStream(payload.payload);
-        FulfillmentInputStream stream01 = new FulfillmentInputStream(byteStream);
+	protected ConditionType readConditiontype() 
+			throws IOException {
+		int value = read16BitUInt();
+		return ConditionType.valueOf(value);
+	}	
 
-        try {
-            switch (type) {
-                case PREIMAGE_SHA256:
-                    return new PreimageSha256Fulfillment(ConditionType.PREIMAGE_SHA256, payload);
-                case PREFIX_SHA256:
-                    byte[] prefix = stream01.readOctetString();
-                    Fulfillment subfulfillment = stream01.readFulfillment();
-                    return new PrefixSha256Fulfillment(ConditionType.PREFIX_SHA256, payload, prefix, subfulfillment);
-                case RSA_SHA256:
-                    /*
-                     * REF: https://interledger.org/five-bells-condition/spec.html#rfc.section.4.4.2
-                     * RsaSha256FulfillmentPayload ::= SEQUENCE {
-                     * modulus OCTET STRING (SIZE(128..512)),
-                     * signature OCTET STRING (SIZE(128..512))
-                     * }
-                     */
-                    byte[] bytesModulus = stream01.readOctetString();
-                    byte[] bytesSignatureRSASHA256 = stream01.readOctetString();
-                    BigInteger modulus = new BigInteger(1, bytesModulus); // TODO: RECHECK
-                    SignaturePayload signature01 = new SignaturePayload(bytesSignatureRSASHA256);
-                    return new RsaSha256Fulfillment(ConditionType.RSA_SHA256, payload, modulus, signature01);
-                case ED25519:
-                    /*
-                 * REF: https://interledger.org/five-bells-condition/spec.html#rfc.section.4.5.2
-                 * Ed25519FulfillmentPayload ::= SEQUENCE {
-                 *     publicKey OCTET STRING (SIZE(32)),
-                 *     signature OCTET STRING (SIZE(64))
-                 * }
-                     */
-                    byte[] bytesPublicKey = stream01.readOctetString();
-                    byte[] bytesSignatureEd25519 = stream01.readOctetString();
-                    java.security.PublicKey publicKey = Ed25519Fulfillment.publicKeyFromByteArray(new KeyPayload(bytesPublicKey));
-                    SignaturePayload signature02 = new SignaturePayload(bytesSignatureEd25519);
-                    return new Ed25519Fulfillment(ConditionType.ED25519, payload, publicKey, signature02);
-                case THRESHOLD_SHA256:
-                    int threshold = stream01.readVarUInt();
-                    int conditionCount = stream01.readVarUInt();
-                    
-                    java.util.List<Integer>     weight_l = new java.util.ArrayList<Integer>();
-                    java.util.List<Fulfillment> ff_l     = new java.util.ArrayList<Fulfillment>();
-                    for (int idx=0; idx < conditionCount; idx++) {
-                        int weight = stream01.readVarUInt();
-                        weight_l.add(weight);
-                        Fulfillment ff = stream01.readFulfillment();
-                        ff_l.add(ff);
-                    }
-                    return new ThresholdSHA256Fulfillment(ConditionType.THRESHOLD_SHA256, payload, threshold, weight_l, ff_l);
-                default:
-                    throw new RuntimeException("Unimplemented fulfillment type encountered.");
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e.toString(), e);
-        } finally {
-            stream01.close();
-        }
-
-    }
-
-    protected ConditionType readConditiontype()
-            throws IOException {
-        int value = read16BitUInt();
-        return ConditionType.valueOf(value);
-    }
-
-    protected byte[] readPayload()
-            throws IOException, UnsupportedLengthException, IllegalLengthIndicatorException {
-
-        return readOctetString();
-    }
-
+	protected byte[] readPayload() 
+			throws IOException, UnsupportedLengthException, IllegalLengthIndicatorException {
+		
+		return readOctetString();
+	}
+	
 }

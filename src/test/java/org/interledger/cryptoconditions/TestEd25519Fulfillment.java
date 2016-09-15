@@ -10,8 +10,13 @@ import org.junit.Test;
 
 import net.i2p.crypto.eddsa.Utils;
 
+<<<<<<< Upstream, based on master
 import org.interledger.cryptoconditions.encoding.FulfillmentInputStream;
 import org.interledger.cryptoconditions.encoding.OerDecodingException;
+=======
+import org.interledger.cryptoconditions.Fulfillment;
+import org.interledger.cryptoconditions.impl.Ed25519Fulfillment;
+>>>>>>> 48817d9 Major refactor
 import org.interledger.cryptoconditions.types.*;
 
 // TODO:(0) Complete tests

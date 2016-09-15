@@ -2,6 +2,7 @@ package org.interledger.cryptoconditions;
 
 import static org.junit.Assert.*;
 
+import org.interledger.cryptoconditions.encoding.FulfillmentFactory;
 import org.junit.Test;
 
 public class TestFulfillmentFactory {

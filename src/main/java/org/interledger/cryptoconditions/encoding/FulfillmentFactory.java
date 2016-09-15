@@ -1,9 +1,10 @@
-package org.interledger.cryptoconditions;
+package org.interledger.cryptoconditions.encoding;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.regex.Pattern;
 
+import org.interledger.cryptoconditions.Fulfillment;
 import org.interledger.cryptoconditions.encoding.Base64Url;
 import org.interledger.cryptoconditions.encoding.FulfillmentInputStream;
 import org.interledger.cryptoconditions.encoding.FulfillmentOutputStream;

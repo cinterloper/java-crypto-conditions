@@ -3,6 +3,14 @@ package org.interledger.cryptoconditions;
 import static org.junit.Assert.*;
 
 import org.junit.Test;
+<<<<<<< Upstream, based on master
+=======
+
+
+import org.interledger.cryptoconditions.Fulfillment;
+import org.interledger.cryptoconditions.impl.PrefixSha256Fulfillment;
+import org.interledger.cryptoconditions.impl.PreimageSha256Fulfillment;
+>>>>>>> 48817d9 Major refactor
 
 // TODO:(0) Complete tests
 public class TestPrefixSha256Fulfillment {

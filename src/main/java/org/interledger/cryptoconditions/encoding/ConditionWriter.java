@@ -10,101 +10,107 @@ import org.interledger.cryptoconditions.FeatureSuite;
 
 public class ConditionWriter extends Writer {
 
-    private static final char[] HEADER = new char[]{'c', 'c'};
-    private static final char[] VERSION = new char[]{'0', '1'};
-    private static final char DELIMITER = ':';
+	private static char[] HEADER = new char[]{'c', 'c'};
+	private static char[] VERSION = new char[]{'0', '1'};
+	private static char DELIMITER = ':';
+	
+	private Writer writer;
+	
+	public ConditionWriter(Writer innerWriter) {
+		this.writer = innerWriter;
+	}
+	
+	/**
+	 * Write the condition to the underlying writer using String encoding
+	 * 
+	 * @param condition
+	 * @throws IOException
+	 */
+	public void writeCondition(Condition condition) throws IOException
+	{
+		writeHeader();
+		writeDelimiter();
+		writeConditionType(condition.getType());
+		writeDelimiter();
+		writeFeatures(condition.getFeatures());
+		writeDelimiter();
+		writeFingerprint(condition.getFingerprint());
+		writeDelimiter();
+		writeMaxFulfillmentLength(condition.getMaxFulfillmentLength());
+		
+	}
+	
+	protected void writeDelimiter()
+			throws IOException
+	{
+		writer.write(DELIMITER);
+	}
+	
+	protected void writeHeader() 
+			throws IOException
+	{
+		writer.write(HEADER);
+	}
 
-    private Writer writer;
+	protected void writeVersion() 
+			throws IOException
+	{
+		writer.write(VERSION);
+	}
 
-    public ConditionWriter(Writer innerWriter) {
-        this.writer = innerWriter;
-    }
+	protected void writeConditionType(ConditionType type) 
+			throws IOException 
+	{
+		writer.write(Integer.toString(type.getTypeCode(), 16));
+	}
+	
 
-    /**
-     * Write the condition to the underlying writer using String encoding
-     *
-     * @param condition
-     * @throws IOException
-     */
-    public void writeCondition(Condition condition) throws IOException {
-        writeHeader();
-        writeDelimiter();
-        writeVersion();
-        writeDelimiter();
-        writeConditionType(condition.getType());
-        writeDelimiter();
-        writeFeatures(condition.getFeatures());
-        writeDelimiter();
-        writeFingerprint(condition.getFingerprint());
-        writeDelimiter();
-        writeMaxFulfillmentLength(condition.getMaxFulfillmentLength());
+	protected void writeFeatures(EnumSet<FeatureSuite> features) 
+			throws IOException {
+		int bitmask = FeatureSuiteEncoding.getBitmaskFromFeatures(features);
+		writer.write(Integer.toString(bitmask, 16));		
+	}
+	
+	protected void writeFingerprint(byte[] fingerprint) 
+			throws IOException {
+		
+		writer.write(Hex.encode(fingerprint));
+	}
 
-    }
+	protected void writeMaxFulfillmentLength(int maxFulfillmentLength) 
+			throws IOException {
+		
+		writer.write(Integer.toString(maxFulfillmentLength));
+	}
+	
+	
+	@Override
+	public void write(char[] cbuf, int off, int len) throws IOException {
+		writer.write(cbuf, off, len);
+	}
 
-    protected void writeDelimiter()
-            throws IOException {
-        writer.write(DELIMITER);
-    }
+	@Override
+	public void flush() throws IOException {
+		writer.flush();
+	}
 
-    protected void writeHeader()
-            throws IOException {
-        writer.write(HEADER);
-    }
-
-    protected void writeVersion()
-            throws IOException {
-        writer.write(VERSION);
-    }
-
-    protected void writeConditionType(ConditionType type)
-            throws IOException {
-        writer.write(Integer.toString(type.getTypeCode(), 16));
-    }
-
-    protected void writeFeatures(EnumSet<FeatureSuite> features)
-            throws IOException {
-
-        //TODO - This is easy to read but could probably be optimized
-        int encoded_bitmask = 0;
-        for (FeatureSuite featureSuite : features) {
-            encoded_bitmask += featureSuite.toInt();
-        }
-
-        writer.write(Integer.toString(encoded_bitmask, 16));
-    }
-
-    protected void writeFingerprint(byte[] fingerprint)
-            throws IOException {
-
-        writer.write(Base64Url.encode(fingerprint));
-    }
-
-    protected void writeMaxFulfillmentLength(int maxFulfillmentLength)
-            throws IOException {
-
-        writer.write(Integer.toString(maxFulfillmentLength));
-    }
-
-    @Override
-    public void write(char[] cbuf, int off, int len) throws IOException {
-        writer.write(cbuf, off, len);
-    }
-
-    @Override
-    public void flush() throws IOException {
-        writer.flush();
-    }
-
-    @Override
-    public void close() throws IOException {
-        try {
-            writer.flush();
-            writer.close();
-        } catch(Exception e) {
-            // TODO: Improvement. Inject Logger.
-            System.out.println("WARN: Couldn't properly close the stream due to "+
-                e.toString()+", Some data could have not been flushed to disk");
-        }
-    }
+	@Override
+	public void close() throws IOException {
+		writer.close();
+	}
+	
+	private static class Hex {
+		private static final char[] hexArray = "0123456789ABCDEF".toCharArray();
+		
+		public static String encode(byte[] bytes) {
+		    char[] hexChars = new char[bytes.length * 2];
+		    for ( int j = 0; j < bytes.length; j++ ) {
+		        int v = bytes[j] & 0xFF;
+		        hexChars[j * 2] = hexArray[v >>> 4];
+		        hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+		    }
+		    return new String(hexChars);
+		}
+	}
 
 }

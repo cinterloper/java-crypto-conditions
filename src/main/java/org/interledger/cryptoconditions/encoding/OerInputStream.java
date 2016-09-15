@@ -79,57 +79,90 @@ public class OerInputStream extends InputStream {
 
     }
 
-    public byte[] readOctetString() throws IOException, UnsupportedLengthException, IllegalLengthIndicatorException {
-        int length = readLengthIndicator();
-        if (length == 0) {
+	public byte[] readOctetString() throws IOException, UnsupportedLengthException, IllegalLengthIndicatorException {
+		return readOctetString(0,Integer.MAX_VALUE);
+	}
+
+
+	public byte[] readOctetString(int fixedLength) throws IOException {
+        
+        if (fixedLength == 0) {
             return new byte[]{};
         }
-        byte[] value = new byte[length];
-        int bytesRead = 0;
-        bytesRead = stream.read(value, 0, length);
+        
+		byte[] value = new byte[fixedLength];
+		
+		int bytesRead = stream.read(value, 0, fixedLength);
+		
+		if(bytesRead < fixedLength) {
+			throw new EOFException("Unexpected EOF when trying to decode OER data.");
+		}
 
-        if (bytesRead < length) {
-            throw new EOFException("Unexpected EOF when trying to decode OER data.");
-        }
-        return value;
-    }
+		return value;
+	}
+	
 
+	public byte[] readOctetString(int minSize, int maxSize) 
+			throws UnsupportedLengthException, IllegalLengthIndicatorException, IOException {
+		
+		int length = readLengthIndicator();
+		
+		if(length < minSize)
+			throw new UnsupportedLengthException(
+					"Length indicator indicates the OCTET STRING to be " + length +
+					" bytes which is less than the minimum size of " + minSize + "bytes.");
+		
+		if(length > maxSize)
+			throw new UnsupportedLengthException(
+					"Length indicator indicates the OCTET STRING to be " + length +
+					" bytes which is greater than the maximum size of " + maxSize + "bytes.");
+		
+		byte[] value = new byte[length];
+		
+		int bytesRead = stream.read(value, 0, length);
+		
+		if(bytesRead < length) {
+			throw new EOFException("Unexpected EOF when trying to decode OER data.");
+		}
+
+		return value;
+	}
+		
     @Override
     public int read() throws IOException {
         return this.stream.read();
     }
 
-    protected int readLengthIndicator()
+	public int readLengthIndicator() 
             throws IOException, UnsupportedLengthException, IllegalLengthIndicatorException {
         int length = stream.read();
-System.out.println("deteleme:  byte length = (byte) stream.read():"+length);
-
         verifyNotEOF(length);
 
         if (length < 128) {
             return length;
-        } else if (length > 128) {
-            int lengthOfLength = length - 128;
+		}		
+		else if(length > 128)
+		{
+			int lengthOfLength = length - 128;
             if (lengthOfLength > 3) {
                 throw new UnsupportedLengthException("This implementation only supports "
                         + "variable length fields up to 16777215 bytes.");
             }
             length = 0;
-            for (int i = lengthOfLength; i > 0; i--) {
+			for (int i = 1; i <= lengthOfLength; i++) {
                 int next = stream.read();
                 verifyNotEOF(next);
-                length += (next << (8 * (i - 1)));
+				length += (next << (8 * (length - i)));
             }
             return length;
         } else {
             throw new IllegalLengthIndicatorException("First byte of length indicator can't be 0x80.");
         }
     }
-
-    protected void verifyNotEOF(int data) throws EOFException {
-        if (data == -1) {
-            throw new EOFException("Unexpected EOF when trying to decode OER data.");
-        }
-    }
-
+	
+	protected void verifyNotEOF(int data) throws EOFException {
+		if(data == -1){
+			throw new EOFException("Unexpected EOF when trying to decode OER data.");
+		}
+	}
 }
