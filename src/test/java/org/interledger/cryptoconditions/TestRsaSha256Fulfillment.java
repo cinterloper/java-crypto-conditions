@@ -1,15 +1,23 @@
 package org.interledger.cryptoconditions;
 
 
-import java.math.BigInteger;
-import java.security.SecureRandom;
+import static org.junit.Assert.assertTrue;
 
-import static org.junit.Assert.*;
+import java.io.UnsupportedEncodingException;
+import java.math.BigInteger;
+import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.KeySpec;
+import java.security.spec.PKCS8EncodedKeySpec;
+
+import org.interledger.cryptoconditions.impl.RsaSha256Fulfillment;
 
 //import javax.xml.bind.DatatypeConverter;
 
 //import org.interledger.cryptoconditions.types.KeyPayload;
-import org.interledger.cryptoconditions.types.MessagePayload;
 import org.junit.Test;
 
 import net.i2p.crypto.eddsa.Utils;
@@ -20,7 +28,8 @@ import net.i2p.crypto.eddsa.Utils;
 public class TestRsaSha256Fulfillment {
 
     @Test
-    public void testCreateRsaShaFullfillmentFromSecrets() {
+    public void testCreateRsaShaFullfillmentFromSecrets() 
+    		throws NoSuchAlgorithmException, UnsupportedEncodingException, InvalidKeySpecException {
         String privateKey  = "-----BEGIN RSA PRIVATE KEY-----\n"
             + "MIIEpAIBAAKCAQEA4e+LJNb3awnIHtd1KqJi8ETwSodNQ4CdMc6mEvmbDJeotDdB\n" + "U+Pu89ZmFoQ+DkHCkyZLcbYXPbHPDWzVWMWGV3Bvzwl/cExIPlnL/f1bPue8gNdA\n"
             + "xeDwR/PoX8DXWBV3am8/I8XcXnlxOaaILjgzakpfs2E3Yg/zZj264yhHKAGGL3Ly\n" + "+HsgK5yJrdfNWwoHb3xT41A59n7RfsgV5bQwXMYxlwaNXm5Xm6beX04+V99eTgcv\n"
@@ -48,14 +57,18 @@ public class TestRsaSha256Fulfillment {
 //        String CC_OK = "cc:3:11:uKkFs6dhGZCwD51c69vVvHYSp25cRi9IlvXfFaxhMjo:518";
         
         SecureRandom saltRandom = new SecureRandom(salt);
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        KeySpec ks = new PKCS8EncodedKeySpec(privateKey.getBytes("UTF-8"));
+        RSAPrivateKey privKey = (RSAPrivateKey) keyFactory.generatePrivate(ks);
+        
         // Build from secrets.
-        RsaSha256Fulfillment ffFromSecrets = RsaSha256Fulfillment.BuildFromSecrets(privateKey, message, saltRandom);
+        RsaSha256Fulfillment ffFromSecrets = RsaSha256Fulfillment.fromPrivateKeyAndMessage(privKey, message);
         BigInteger expectedModulus = new BigInteger(1, modulus);
-        assertTrue(ffFromSecrets.getModulus().compareTo(expectedModulus) == 0);
-        assertTrue(ffFromSecrets.validate(new MessagePayload(message)));
+        assertTrue(ffFromSecrets.getPublicKey().getModulus().compareTo(expectedModulus) == 0);
+        assertTrue(ffFromSecrets.validate(message));
 
-        Fulfillment ffFromURI = FulfillmentFactory.getFulfillmentFromURI(FF_KO);
-        ffFromURI.validate(new MessagePayload(message));
+//        Fulfillment ffFromURI = FulfillmentFactory.getFulfillmentFromURI(FF_KO);
+//        ffFromURI.validate(new MessagePayload(message));
 
 
     }

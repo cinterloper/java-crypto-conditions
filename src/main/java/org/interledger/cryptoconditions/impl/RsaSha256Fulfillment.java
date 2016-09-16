@@ -124,8 +124,7 @@ public class RsaSha256Fulfillment implements Fulfillment {
 		}
 	}
 	
-	public static RsaSha256Fulfillment fromPrivateKeyAndMessage(RSAPrivateKey privateKey, byte[] message) 
-			throws NoSuchAlgorithmException, InvalidKeySpecException {
+	public static RsaSha256Fulfillment fromPrivateKeyAndMessage(RSAPrivateKey privateKey, byte[] message) {
 		
 		//Check that this private key will work with a public key using a fixed exponent of RSA_PUBLIC_EXPONENT
 		if(!isValidPrivateKey(privateKey, RSA_PUBLIC_EXPONENT))
@@ -148,12 +147,21 @@ public class RsaSha256Fulfillment implements Fulfillment {
 		
 	}
 	
-	public static RSAPublicKey getPublicKeyFromModulus(BigInteger modulus) 
-			throws NoSuchAlgorithmException, InvalidKeySpecException {
+	public static RSAPublicKey getPublicKeyFromModulus(BigInteger modulus) {
 		
 		RSAPublicKeySpec spec = new RSAPublicKeySpec(modulus, RSA_PUBLIC_EXPONENT);
-		KeyFactory kf = KeyFactory.getInstance("RSA");
-		return (RSAPublicKey) kf.generatePublic(spec);
+		KeyFactory kf;
+		try {
+			kf = KeyFactory.getInstance("RSA");
+			return (RSAPublicKey) kf.generatePublic(spec);
+		} catch (NoSuchAlgorithmException e) {
+			throw new RuntimeException(e);
+			
+		} catch (InvalidKeySpecException e) {
+			
+			//TODO check modulus before hand so this can't happen
+			throw new RuntimeException(e);
+		}
 	}
 
 	private static boolean isValidPrivateKey(RSAPrivateKey privateKey, BigInteger pubExponent) {
