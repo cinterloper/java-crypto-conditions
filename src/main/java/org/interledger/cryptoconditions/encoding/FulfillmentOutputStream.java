@@ -22,8 +22,6 @@ import org.interledger.cryptoconditions.impl.RsaSha256Fulfillment;
  * @author adrianhopebailie
  */
 public class FulfillmentOutputStream extends OerOutputStream {
-<<<<<<< Upstream, based on master
-=======
 	
 	public FulfillmentOutputStream(OutputStream stream)
 	{
@@ -75,30 +73,6 @@ public class FulfillmentOutputStream extends OerOutputStream {
 		}
 		
 	}
->>>>>>> 48817d9 Major refactor
-
-<<<<<<< Upstream, based on master
-    public FulfillmentOutputStream(OutputStream stream) {
-        super(stream);
-    }
-
-    /**
-     * Write the fulfillment to the underlying stream using OER encoding per the
-     * specification:
-     *
-     * Fulfillment ::= SEQUENCE { type ConditionType, payload OCTET STRING }
-     *
-     * ConditionType ::= INTEGER { preimageSha256(0), rsaSha256(1),
-     * prefixSha256(2), thresholdSha256(3), ed25519(4) } (0..65535)
-     *
-     * @param fulfillment
-     * @throws IOException
-     */
-    public void writeFulfillment(Fulfillment fulfillment) throws IOException {
-        writeConditionType(fulfillment.getType());
-        writePayload(fulfillment.getPayload().payload);
-
-    }
 
     public void writeConditionType(ConditionType type)
             throws IOException {
@@ -109,12 +83,6 @@ public class FulfillmentOutputStream extends OerOutputStream {
             throws IOException {
         writeOctetString(payload);
     }
-=======
-	public void writeConditionType(ConditionType type) 
-			throws IOException
-	{
-		write16BitUInt(type.getTypeCode());
-	}
 	
 	public void writePreimageSha256FulfillmentPayload(PreimageSha256Fulfillment fulfillment) 
 			throws IOException {
@@ -200,6 +168,4 @@ public class FulfillmentOutputStream extends OerOutputStream {
 			return ((ByteArrayOutputStream) stream).toByteArray();
 		}
 	}
-
->>>>>>> 48817d9 Major refactor
 }

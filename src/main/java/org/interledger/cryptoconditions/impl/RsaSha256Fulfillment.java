@@ -90,7 +90,6 @@ public class RsaSha256Fulfillment implements Fulfillment {
 	
 	private byte[] calculateFingerPrintContent(byte[] modulus)
 	{
-		
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 		ConditionOutputStream stream = new ConditionOutputStream(buffer);
 		

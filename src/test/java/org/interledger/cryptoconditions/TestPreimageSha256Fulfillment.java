@@ -6,12 +6,9 @@ import javax.xml.bind.DatatypeConverter;
 
 import org.junit.Test;
 
-<<<<<<< Upstream, based on master
-=======
-
 import org.interledger.cryptoconditions.Fulfillment;
 import org.interledger.cryptoconditions.impl.PreimageSha256Fulfillment;
->>>>>>> 48817d9 Major refactor
+
 // TODO:(0) Complete tests
 public class TestPreimageSha256Fulfillment {
 
@@ -35,13 +32,13 @@ public class TestPreimageSha256Fulfillment {
             String base16preimage = testDataRow01[0];
             byte[] preimage = DatatypeConverter.parseHexBinary(base16preimage);
             String expectedFfURI = testDataRow01[1], expectedCCURI = testDataRow01[2];
-            Fulfillment ff = PreimageSha256Fulfillment.BuildFromSecrets(preimage);
+            Fulfillment ff = PreimageSha256Fulfillment.fromPreimage(preimage);
 //            System.out.println("                    ffURI:"+ffURI);
 //            System.out.println("ff.toURI()               :"+ff.toURI());;
             assertTrue("ffURI.equals(ff.toURI())", expectedFfURI.equals(ff.toURI()));
 //            System.out.println("      expectedCCURI:"+expectedCCURI);
 //            System.out.println("Condition().toURI():"+ff.getCondition().toURI());
-            assertTrue(expectedCCURI.equals(ff.getCondition().toURI()));
+            assertTrue(expectedCCURI.equals(ff.computeCondition().toURI()));
         }
     }
 }

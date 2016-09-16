@@ -2,8 +2,10 @@ package org.interledger.cryptoconditions.encoding;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.regex.Pattern;
 
+import org.interledger.cryptoconditions.ConditionType;
 import org.interledger.cryptoconditions.Fulfillment;
 import org.interledger.cryptoconditions.encoding.Base64Url;
 import org.interledger.cryptoconditions.encoding.FulfillmentInputStream;
@@ -56,7 +58,12 @@ public class FulfillmentFactory {
             // This must never happen. The stream sources are in-memory byte arrays.
             throw new RuntimeException(e.toString(), e);
         } finally {
-            ffos.close();
+            try {
+				ffos.close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
         }
     }
 

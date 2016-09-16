@@ -1,25 +1,33 @@
-package org.interledger.cryptoconditions;
+package org.interledger.cryptoconditions.impl;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
-
-
-
-import java.util.Set;
 import java.util.HashSet;
 import java.util.List;
-import java.util.ArrayList;
-import java.io.ByteArrayOutputStream;
-import java.util.Collections;
+import java.util.Set;
 
-import org.interledger.cryptoconditions.encoding.OerOutputStream;
+import org.interledger.cryptoconditions.Condition;
+import org.interledger.cryptoconditions.ConditionType;
+import org.interledger.cryptoconditions.FeatureSuite;
+import org.interledger.cryptoconditions.Fulfillment;
+import org.interledger.cryptoconditions.encoding.ByteArrayOutputStreamPredictor;
 import org.interledger.cryptoconditions.encoding.ConditionOutputStream;
 import org.interledger.cryptoconditions.encoding.FulfillmentOutputStream;
-import org.interledger.cryptoconditions.encoding.ByteArrayOutputStreamPredictor;
-import org.interledger.cryptoconditions.types.FulfillmentPayload;
-import org.interledger.cryptoconditions.types.MessagePayload;
+import org.interledger.cryptoconditions.encoding.OerOutputStream;
+import org.interledger.cryptoconditions.encoding.OerUtil;
 
-public class ThresholdSHA256Fulfillment extends FulfillmentBase {
+public class ThresholdSHA256Fulfillment implements Fulfillment {
 
+	private static ConditionType TYPE = ConditionType.THRESHOLD_SHA256;
+	private static EnumSet<FeatureSuite> FEATURES = EnumSet.of(
+			FeatureSuite.SHA_256, 
+			FeatureSuite.THRESHOLD
+		);
+
+	
     private class OrderableByteBuffer implements Comparable<OrderableByteBuffer> {
         byte[] buffer;
         public OrderableByteBuffer(byte[] buffer){
@@ -44,6 +52,7 @@ public class ThresholdSHA256Fulfillment extends FulfillmentBase {
             return lexicoComparation;
         }
     }
+    
     private class WeightedFulfillment implements Comparable<WeightedFulfillment> {
         final int weight;
         final Fulfillment subff;
@@ -52,17 +61,17 @@ public class ThresholdSHA256Fulfillment extends FulfillmentBase {
         private WeightedFulfillment(int weight, Fulfillment subfulfillment) {
             this.weight = weight;
             this.subff = subfulfillment;
-            conditionFingerprint = this.subff.getCondition().getFingerprint();
+            conditionFingerprint = this.subff.computeCondition().getFingerprint();
         }
         
         void setIdx(int idx) { this.idx = idx; }
         
         int getSize() {
-            return this.subff.serializeBinary().length;
+            return OerUtil.getOerEncodedFulfillment(this.subff).length;
         }
 
         int getOmitSize() {
-            return this.subff.getCondition().serializeBinary().length;
+            return OerUtil.getOerEncodedCondition(this.subff.computeCondition()).length;
         }
 
         @Override
@@ -97,12 +106,11 @@ public class ThresholdSHA256Fulfillment extends FulfillmentBase {
             return this.weight - another.weight;
         }
     }
-   
-    
+       
     private final long threshold; // FIXME Check that it's smaller than 2<<31 since it must be converted to int.
     private final List<WeightedFulfillment> subfulfillments;
 
-    public ThresholdSHA256Fulfillment(ConditionType type, FulfillmentPayload payload, 
+    public ThresholdSHA256Fulfillment(ConditionType type, byte[] payload, 
             int threshold, List<Integer>weight_l, List<Fulfillment> ff_l){
         if (weight_l.size() != ff_l.size()) {
             throw new RuntimeException("Can't zip weight_l && ff_l. Size differs ");
@@ -116,12 +124,17 @@ public class ThresholdSHA256Fulfillment extends FulfillmentBase {
         for (int idx=0; idx<wff_l.size(); idx++) { wff_l.get(idx).setIdx(idx); }
         this.subfulfillments = wff_l;
         
-        this.payload = new FulfillmentPayload(writePayload());
         throw new RuntimeException("FIXME Implement?");
     }
-
+    
+	@Override
+	public ConditionType getType() {
+		return TYPE;
+	}
+    
     @Override
-    public Condition generateCondition() {
+    public Condition computeCondition() {
+    	
         //writeHashPayload (hasher) /* Produce the contents of the condition hash. */ {
         //  const subconditions = this.subconditions // Serialize each subcondition with weight
         //        .map((c) => { writer.writeVarUInt(c.weight),  writer.write(getConditionBinary()) })
@@ -139,13 +152,17 @@ public class ThresholdSHA256Fulfillment extends FulfillmentBase {
             for (int idx = 0; idx < this.subfulfillments.size(); idx++) {
             	WeightedFulfillment w_ff = this.subfulfillments.get(idx);
                 cos.writeVarUInt(w_ff.weight);
-                cos.writeCondition(w_ff.subff.getCondition());
+                cos.writeCondition(w_ff.subff.computeCondition());
             }
             fingerprint = baos.toByteArray();
         } catch(Exception e){
             throw new RuntimeException(e.toString(), e);
         } finally {
-            cos.close();
+            try {
+				cos.close();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
         }
 
     	int fulfillmentMaxLength = this.calculateMaxFulfillmentLength();
@@ -157,7 +174,7 @@ public class ThresholdSHA256Fulfillment extends FulfillmentBase {
     }
 
     @Override
-    public boolean validate(MessagePayload message) {
+    public boolean validate(byte[] message) {
         //validate (message) {
         //  const fulfillments = this.subconditions.filter((cond) => cond.type === FULFILLMENT)
         //
@@ -184,7 +201,7 @@ public class ThresholdSHA256Fulfillment extends FulfillmentBase {
                 FeatureSuite.THRESHOLD );
         EnumSet<FeatureSuite> result = BASE_FEATURES;
         for (WeightedFulfillment ff : subfulfillments ){
-            EnumSet<FeatureSuite> childFeatures = ff.subff.getFeatures();
+            EnumSet<FeatureSuite> childFeatures = ff.subff.computeCondition().getFeatures();
             for (FeatureSuite fs : childFeatures) {
                 if (! result.contains(fs)) { result.add(fs); }
             }
@@ -205,11 +222,11 @@ public class ThresholdSHA256Fulfillment extends FulfillmentBase {
     }
 
     static int predictSubconditionLength(Condition cond) {
-        return cond.serializeBinary().length; 
+        return OerUtil.getOerEncodedCondition(cond).length; 
     }
 
     static int predictSubfulfillmentLength(Fulfillment ff) {
-        int fulfillmentLength = ff.getCondition().getMaxFulfillmentLength();
+        int fulfillmentLength = ff.computeCondition().getMaxFulfillmentLength();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         OerOutputStream cos = new OerOutputStream(baos);
         try {
@@ -223,7 +240,11 @@ public class ThresholdSHA256Fulfillment extends FulfillmentBase {
         }catch(Exception e) {
             throw new RuntimeException(e.toString(), e);
         } finally {
-            cos.close();
+            try {
+				cos.close();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
         }
     }
 
@@ -243,7 +264,7 @@ public class ThresholdSHA256Fulfillment extends FulfillmentBase {
         List<WeightAndSize> WeightAndSize_l = new java.util.ArrayList<WeightAndSize>();
         for (int idx=0; idx < this.subfulfillments.size(); idx++) {
             WeightedFulfillment wfulf = this.subfulfillments.get(idx);
-            Condition cond = this.subfulfillments.get(idx).subff.getCondition();
+            Condition cond = this.subfulfillments.get(idx).subff.computeCondition();
             int conditionLength   = ThresholdSHA256Fulfillment.predictSubconditionLength(cond);
             int fulfillmentLength = ThresholdSHA256Fulfillment.predictSubfulfillmentLength(wfulf.subff);
             totalConditionLength += conditionLength;
@@ -274,7 +295,11 @@ public class ThresholdSHA256Fulfillment extends FulfillmentBase {
         } catch(Exception e) {
             throw new RuntimeException(e.toString(), e);
         } finally { 
-            ffos.close();
+            try {
+				ffos.close();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
         }
     }
 
@@ -316,7 +341,7 @@ public class ThresholdSHA256Fulfillment extends FulfillmentBase {
         for (int idx=0; idx<this.subfulfillments.size(); idx++) {
             WeightedFulfillment subff = this.subfulfillments.get(idx);
             if (! smallestFFSet.set.contains(subff.idx) ) {
-                optimizedConditions.add(subff.subff.getCondition());
+                optimizedConditions.add(subff.subff.computeCondition());
             }
         }
 
@@ -328,12 +353,16 @@ public class ThresholdSHA256Fulfillment extends FulfillmentBase {
             try {
                 WeightedFulfillment wff = this.subfulfillments.get(idx);
                 cos.writeVarUInt(wff.weight);
-                cos.writeOctetString(wff.subff.serializeBinary());
+                cos.writeOctetString(OerUtil.getOerEncodedFulfillment(wff.subff));
                 sortedSubconditions.add(new OrderableByteBuffer(baos.toByteArray()));
             }catch(Exception e) {
                 throw new RuntimeException(e.toString(), e);
             } finally {
-                cos.close();
+                try {
+					cos.close();
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
             }
         }
         Collections.sort(sortedSubconditions);
@@ -354,8 +383,13 @@ public class ThresholdSHA256Fulfillment extends FulfillmentBase {
         }catch(Exception e) {
             throw new RuntimeException(e.toString(), e);
         } finally {
-            cos.close();
+            try {
+				cos.close();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
         }
 
     }
+
 }

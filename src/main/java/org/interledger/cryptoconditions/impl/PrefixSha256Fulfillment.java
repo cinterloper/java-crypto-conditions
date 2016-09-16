@@ -2,6 +2,7 @@ package org.interledger.cryptoconditions.impl;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.EnumSet;
 
 import org.interledger.cryptoconditions.Condition;
@@ -93,7 +94,11 @@ public class PrefixSha256Fulfillment implements Fulfillment {
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		} finally {
+			try {
 				stream.close();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
 		}
 	}
 	
@@ -124,15 +129,10 @@ public class PrefixSha256Fulfillment implements Fulfillment {
 		if (this.subfulfillment == null)
 			throw new NullPointerException("Subfulfillment is null.");
 		
-		ByteArrayOutputStream outputStream = new ByteArrayOutputStream( );
-		try {
-			outputStream.write( this.prefix);
-			outputStream.write( message );
-		} catch (IOException e) {
-			throw new RuntimeException(e.toString());
-		}
+		byte[] prefixMessage = Arrays.copyOf(this.prefix, this.prefix.length + message.length);
+		System.arraycopy(message, 0, prefixMessage, this.prefix.length, message.length);		  
 		
-		return this.subfulfillment.validate(outputStream.toByteArray());
+		return this.subfulfillment.validate(prefixMessage);
 	}
 	
 	public static PrefixSha256Fulfillment fromPrefixAndFulfillment(byte[] prefix, Fulfillment subfulfillment) {

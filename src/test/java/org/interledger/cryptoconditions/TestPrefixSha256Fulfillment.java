@@ -2,15 +2,9 @@ package org.interledger.cryptoconditions;
 
 import static org.junit.Assert.*;
 
-import org.junit.Test;
-<<<<<<< Upstream, based on master
-=======
-
-
-import org.interledger.cryptoconditions.Fulfillment;
 import org.interledger.cryptoconditions.impl.PrefixSha256Fulfillment;
 import org.interledger.cryptoconditions.impl.PreimageSha256Fulfillment;
->>>>>>> 48817d9 Major refactor
+import org.junit.Test;
 
 // TODO:(0) Complete tests
 public class TestPrefixSha256Fulfillment {
@@ -18,10 +12,11 @@ public class TestPrefixSha256Fulfillment {
     @Test
     public void testCreateFromPrefixAndSubfulfillment() {
         String preimage = "616263";
-        Fulfillment PreimageSubff = PreimageSha256Fulfillment.BuildFromSecrets(preimage.getBytes());
+        Fulfillment PreimageSubff = PreimageSha256Fulfillment.fromPreimage(preimage.getBytes());
         byte[] prefix = {1, 2, 3, 4};
-        PrefixSha256Fulfillment ffPrefix = PrefixSha256Fulfillment.BuildFromParams(prefix, PreimageSubff);
+        PrefixSha256Fulfillment ffPrefix = PrefixSha256Fulfillment.fromPrefixAndFulfillment(prefix, PreimageSubff);
         // TODO:(?) Improve this test.
+        
         String output = new String(((PreimageSha256Fulfillment) ffPrefix.getSubFulfillment()).getPayload().payload);
         assertTrue("preimage.equals(output)", preimage.equals(output));
     }
