@@ -10,18 +10,20 @@ import java.util.EnumSet;
  */
 public enum ConditionType {
 	
-	PREIMAGE_SHA256(0),
-	PREFIX_SHA256(1),
-	THRESHOLD_SHA256(2),
-	RSA_SHA256(3),
-	ED25519(4);
+	PREIMAGE_SHA256(0, "PREIMAGE-SHA-256"),
+	PREFIX_SHA256(1, "PREFIX-SHA-256"),
+	THRESHOLD_SHA256(2, "THRESHOLD-SHA-256"),
+	RSA_SHA256(3, "RSA-SHA-256"),
+	ED25519(4, "ED25519");
 
 	
 	private final int typeCode;
+	private final String name;
 	
-	ConditionType(int typeCode)
+	ConditionType(int typeCode, String algorithmName)
 	{
 		this.typeCode = typeCode;
+		this.name = algorithmName;
 	}
 	
 	/**
@@ -31,6 +33,10 @@ public enum ConditionType {
 	 */
 	public int getTypeCode() {
 		return this.typeCode;
+	}
+	
+	public String toString() {
+		return this.name;
 	}
 		
 	public static ConditionType valueOf(int typeCode) {

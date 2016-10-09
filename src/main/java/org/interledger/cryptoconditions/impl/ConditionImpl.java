@@ -6,6 +6,7 @@ import java.util.EnumSet;
 import org.interledger.cryptoconditions.Condition;
 import org.interledger.cryptoconditions.ConditionType;
 import org.interledger.cryptoconditions.FeatureSuite;
+import org.interledger.cryptoconditions.oer.OerUtil;
 
 /**
  * Convenience class used to generate a new immutable 
@@ -13,19 +14,14 @@ import org.interledger.cryptoconditions.FeatureSuite;
  * 
  * @author adrianhopebailie
  */
-class ConditionImpl implements Condition {
+public class ConditionImpl implements Condition {
 
 	// Condition Interface related members 
 	private final ConditionType type;
 	private final EnumSet<FeatureSuite> features;
 	private final byte[] fingerprint;
 	private final int maxFulfillmentLength;
-
-	// URISerializable Interface related members
-	//TODO - Move to writer
-	//private static final String CONDITION_REGEX = "^cc:([1-9a-f][0-9a-f]{0,3}|0):[1-9a-f][0-9a-f]{0,15}:[a-zA-Z0-9_-]{0,86}:([1-9][0-9]{0,17}|0)$";
-	//private static final java.util.regex.Pattern p = java.util.regex.Pattern.compile(CONDITION_REGEX);
-		
+	
 	public ConditionImpl(ConditionType type, EnumSet<FeatureSuite> features, 
 			byte[] fingerprint, int maxFulfillmentLength) {
 
@@ -41,9 +37,13 @@ class ConditionImpl implements Condition {
 		if (maxFulfillmentLength < 0) 
 			throw new IllegalArgumentException("MaxFulfillmentLength can't be negative.");
 		
+		if (maxFulfillmentLength > OerUtil.MAX_INT) 
+			throw new IllegalArgumentException("MaxFulfillmentLength greater than " 
+					+ OerUtil.MAX_INT + " are not supported.");
+		
 		this.type = type;
-		this.fingerprint = fingerprint;
-		this.features = features;
+		this.fingerprint = Arrays.copyOf(fingerprint, fingerprint.length);
+		this.features = EnumSet.copyOf(features);
 		this.maxFulfillmentLength = maxFulfillmentLength;
 	}
 
