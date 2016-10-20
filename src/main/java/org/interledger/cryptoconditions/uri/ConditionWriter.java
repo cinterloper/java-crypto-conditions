@@ -113,5 +113,16 @@ public class ConditionWriter extends Writer {
 		    return new String(hexChars);
 		}
 	}
-
+	
+	public static char[] getHeader() {
+		return HEADER;
+	}
+	
+	public static char[] getVersion() {
+		return VERSION;
+	}
+	
+	public static char getDelimiter() {
+		return DELIMITER;
+	}
 }
